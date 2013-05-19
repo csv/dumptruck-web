@@ -7,6 +7,8 @@ import sqlite3
 
 import dumptruck
 
+from serialize import SERIALIZATIONS
+
 # For fastcgi at least, the HTTP status code must be specified
 # as a 'Status:' header.  See http://www.fastcgi.com/docs/faq.html#httpstatus
 # Template used by headers_for_status function
@@ -132,7 +134,7 @@ def execute_query(sql, dbname):
 
     return code, data
 
-def sql(boxhome=os.path.join('/', 'home')):
+def sql(boxhome=os.path.join('/', 'home'), serialization = 'json'):
     """
     Implements a CGI interface for SQL queries to boxes.
 
@@ -150,7 +152,7 @@ def sql(boxhome=os.path.join('/', 'home')):
     except QueryError as e:
         code = e.code
         body = e.message
-    body = json.dumps(body)
+    body = SERIALIZATIONS[serialization](body)
 
     headers = headers_for_status(code)
     return headers + '\n\n' + body + '\n'
@@ -165,7 +167,7 @@ def meta(boxhome=os.path.join('/', 'home')):
         raise QueryError('Error: exactly one box= parameter should be specified', code=400)
     box = boxs[0]
     dbname = get_database_name(boxhome, box)
-    
+
     try:
         dt = open_dumptruck(dbname)
         res = {}
@@ -231,7 +233,13 @@ if __name__ == '__main__':
     method = methods[0]
 
     if method == 'sql':
-        print sql()
+        serializations = form.getlist('serialization')
+        if len(serializations) > 1:
+            print '"Error: exactly one serialization= parameter should be specified"'
+        elif len(serializations) == 1:
+            print sql(serialization = serializations[0])
+        else:
+            print sql()
     elif method == 'meta':
         print meta()
     else:
